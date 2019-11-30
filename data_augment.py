@@ -7,11 +7,10 @@ import numpy as np
 
 # AUGMENT SETTINGS
 parser = argparse.ArgumentParser(description="PyTorch MASRN")
-parser.add_argument("--Scale", type=int, default=2)
 parser.add_argument("--HRpath", type=str, default='data/DIV2K_train_HR')
-parser.add_argument("--Savepath", type=str, default='data/train_x2.h5')
+parser.add_argument("--Savepath", type=str, default='data/train_x234.h5')
 parser.add_argument("--LRsize", type=int, default=48)
-parser.add_argument("--Cropnum", type=int, default=100)
+parser.add_argument("--Cropnum", type=int, default=30)
 
 def data_aug():
     global opt
@@ -23,10 +22,11 @@ def data_aug():
     HRpath = load_img(opt.HRpath)
     for _ in HRpath:
         HR_img = read_img(_)
-        sub_image = random_crop(HR_img, opt.Cropnum, opt.LRsize * opt.Scale, opt.Scale)
-        input, label = img_downsize(sub_image, opt.Scale)
-        sub_ip += input
-        sub_la += label
+        for scale in [2,3,4]:
+            sub_image = random_crop(HR_img, opt.Cropnum, opt.LRsize * scale, scale)
+            input, label = img_downsize(sub_image, scale)
+            sub_ip += input
+            sub_la += label
         print('data no.',num)
         num += 1
     sub_ip = np.asarray(sub_ip)
