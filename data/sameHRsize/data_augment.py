@@ -7,10 +7,9 @@ import numpy as np
 
 # AUGMENT SETTINGS
 parser = argparse.ArgumentParser(description="PyTorch MASRN")
-parser.add_argument("--Scale", type=int, default=2)
 parser.add_argument("--HRpath", type=str, default='data/DIV2K_train_HR')
-parser.add_argument("--Savepath", type=str, default='data/train_x2.h5')
-parser.add_argument("--LRsize", type=int, default=48)
+parser.add_argument("--Savepath", type=str, default='data/train_x234.h5')
+parser.add_argument("--Cropsize", type=int, default=48)
 parser.add_argument("--Cropnum", type=int, default=100)
 
 def data_aug():
@@ -23,17 +22,24 @@ def data_aug():
     HRpath = load_img(opt.HRpath)
     for _ in HRpath:
         HR_img = read_img(_)
-        sub_image = random_crop(HR_img, opt.Cropnum, opt.LRsize * opt.Scale, opt.Scale)
-        input, label = img_downsize(sub_image, opt.Scale)
+        sub_image = random_crop(HR_img, opt.Cropnum, opt.Cropsize)
+        input = transfer_input(sub_image)
+        label_x2 = img_downsize(sub_image, 2)
+        label_x3 = img_downsize(sub_image, 3)
+        label_x4 = img_downsize(sub_image, 4)
         sub_ip += input
-        sub_la += label
+        sub_la_2 += label_x2
+        sub_la_3 += label_x3
+        sub_la_4 += label_x4
         print('data no.',num)
         num += 1
     sub_ip = np.asarray(sub_ip)
-    sub_la = np.asarray(sub_la)
+    sub_la_2 = np.asarray(sub_la_2)
+    sub_la_3 = np.asarray(sub_la_3)
+    sub_la_4 = np.asarray(sub_la_4)
     print('input shape : ',sub_ip.shape)
-    print('label shape : ',sub_la.shape)
-    save_h5(sub_ip, sub_la, opt.Savepath)
+    print('label shape : x2[',sub_la_2.shape,'], x3[',sub_la_3.shape,'], x4['sub_la_4.shape,']')
+    save_h5(sub_ip, sub_la_2, sub_la_3, sub_la_4, opt.Savepath)
     print('---------save---------')
 
 def load_img(file_path):
@@ -53,34 +59,43 @@ def mod_crop(image, scale):
     w = w - np.mod(w,scale)
     return image[0:h,0:w,:]
 
-def random_crop(image, Cropnum, Cropsize, scale):
+def random_crop(image, Cropnum, Cropsize):
     sub_img = []
     i = 0
     while i < Cropnum:
         h = np.random.randint(0, image.shape[0] - Cropsize)
         w = np.random.randint(0, image.shape[1] - Cropsize)
         sub_i = image[h:h+Cropsize,w:w+Cropsize]
-        sub_i = mod_crop(sub_i, scale)
+        sub_i = mod_crop(sub_i, 4)
+        sub_i = mod_crop(sub_i, 3)
         sub_img.append(sub_i)
         i += 1
     return sub_img
 
-def img_downsize(img, scale):
-    dst_list = []
+def transfer_input(img):
     img_list = []
     for _ in img:
         h = _.shape[0]
         w = _.shape[1]
         img_list.append(_.reshape(3, h, w))
-        dst = cv2.resize(_, dsize=(0, 0), fx=1/scale, fy=1/scale, interpolation=cv2.INTER_CUBIC)
-        dst_list.append(dst.reshape(3, int(h/scale), int(w/scale)))
-    return dst_list, img_list
+    return img_list
 
-def save_h5(sub_ip, sub_la, savepath):
+def img_downsize(img, scale):
+    dst_list = []
+    for _ in img:
+        h = _.shape[0]
+        w = _.shape[1]
+        dst = cv2.resize(_, dsize=(0, 0), fx=1/scale, fy=1/scale, interpolation=cv2.INTER_CUBIC)
+        dst_list.append(dst.reshape(3, h/scale, w/scale))
+    return dst_list
+
+def save_h5(sub_ip, sub_la_2, sub_la_3, sub_la_4, savepath):
     path = os.path.join(os.getcwd(), savepath)
     with h5py.File(path, 'w') as hf:
         hf.create_dataset('input', data=sub_ip)
-        hf.create_dataset('label', data=sub_la)
+        hf.create_dataset('label_x2', data=sub_la_2)
+        hf.create_dataset('label_x3', data=sub_la_3)
+        hf.create_dataset('label_x4', data=sub_la_4)
 
 if __name__ == '__main__':
     print('starting data augmentation...')
