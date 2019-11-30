@@ -10,30 +10,45 @@ parser = argparse.ArgumentParser(description="PyTorch MASRN")
 parser.add_argument("--HRpath", type=str, default='data/DIV2K_train_HR')
 parser.add_argument("--Savepath", type=str, default='data/train_x234.h5')
 parser.add_argument("--LRsize", type=int, default=48)
-parser.add_argument("--Cropnum", type=int, default=30)
+parser.add_argument("--Cropnum", type=int, default=20)
 
 def data_aug():
     global opt
     opt = parser.parse_args()
     print(opt)
-    sub_ip = []
-    sub_la = []
+    sub_ip_2 = []
+    sub_la_2 = []
+    sub_ip_3 = []
+    sub_la_3 = []
+    sub_ip_4 = []
+    sub_la_4 = []
     num = 1
     HRpath = load_img(opt.HRpath)
     for _ in HRpath:
         HR_img = read_img(_)
-        for scale in [2,3,4]:
-            sub_image = random_crop(HR_img, opt.Cropnum, opt.LRsize * scale, scale)
-            input, label = img_downsize(sub_image, scale)
-            sub_ip += input
-            sub_la += label
+        sub_image = random_crop(HR_img, opt.Cropnum, opt.LRsize * 2, 2)
+        input, label = img_downsize(sub_image, 2)
+        sub_ip_2 += input
+        sub_la_2 += label
+        sub_image = random_crop(HR_img, opt.Cropnum, opt.LRsize * 3, 3)
+        input, label = img_downsize(sub_image, 3)
+        sub_ip_3 += input
+        sub_la_3 += label
+        sub_image = random_crop(HR_img, opt.Cropnum, opt.LRsize * 4, 4)
+        input, label = img_downsize(sub_image, 4)
+        sub_ip_4 += input
+        sub_la_4 += label
         print('data no.',num)
         num += 1
-    sub_ip = np.asarray(sub_ip)
-    sub_la = np.asarray(sub_la)
-    print('input size : ',sub_ip.shape[0])
-    print('label size : ',sub_la.shape[0])
-    save_h5(sub_ip, sub_la, opt.Savepath)
+    sub_ip_2 = np.asarray(sub_ip_2)
+    sub_ip_3 = np.asarray(sub_ip_3)
+    sub_ip_4 = np.asarray(sub_ip_4)
+    sub_la_2 = np.asarray(sub_la_2)
+    sub_la_3 = np.asarray(sub_la_3)
+    sub_la_4 = np.asarray(sub_la_4)
+    print('input shape : x2[',sub_ip_2.shape,'], x3[',sub_ip_3.shape,'], x4[',sub_ip_4.shape,']')
+    print('label shape : x2[',sub_la_2.shape,'], x3[',sub_la_3.shape,'], x4[',sub_la_4.shape,']')
+    save_h5(sub_ip_2, sub_ip_3, sub_ip_4, sub_la_2, sub_la_3, sub_la_4, opt.Savepath)
     print('---------save---------')
 
 def load_img(file_path):
@@ -76,11 +91,15 @@ def img_downsize(img, scale):
         dst_list.append(dst.reshape(3, int(h/scale), int(w/scale)))
     return dst_list, img_list
 
-def save_h5(sub_ip, sub_la, savepath):
+def save_h5(sub_ip_2, sub_ip_3, sub_ip_4, sub_la_2, sub_la_3, sub_la_4, savepath):
     path = os.path.join(os.getcwd(), savepath)
     with h5py.File(path, 'w') as hf:
-        hf.create_dataset('input', data=sub_ip)
-        hf.create_dataset('label', data=sub_la)
+        hf.create_dataset('input_x2', data=sub_ip_2)
+        hf.create_dataset('input_x3', data=sub_ip_3)
+        hf.create_dataset('input_x4', data=sub_ip_4)
+        hf.create_dataset('label_x2', data=sub_la_2)
+        hf.create_dataset('label_x3', data=sub_la_3)
+        hf.create_dataset('label_x4', data=sub_la_4)
 
 if __name__ == '__main__':
     print('starting data augmentation...')
