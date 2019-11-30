@@ -31,8 +31,8 @@ def data_aug():
         num += 1
     sub_ip = np.asarray(sub_ip)
     sub_la = np.asarray(sub_la)
-    print('input shape : ',sub_ip.shape)
-    print('label shape : ',sub_la.shape)
+    print('input size : ',sub_ip.shape[0])
+    print('label size : ',sub_la.shape[0])
     save_h5(sub_ip, sub_la, opt.Savepath)
     print('---------save---------')
 
