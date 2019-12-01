@@ -50,7 +50,10 @@ def main():
 
     print("===> Building model")
     model = MsINSR_Net()
+
+
     L1loss = nn.L1Loss()
+
 
     # optionally copy weights from a checkpoint
     if opt.pretrained:
@@ -88,8 +91,18 @@ def main():
                 if torch.cuda.is_available():
                     HR = HR.cuda()
                     LR = LR.cuda()
-                fake_img = model(LR, scale_)
+                if model_scale == 2:
+                    fake_img = model2(LR, scale_)
+                    model.zero_grad()
+                    loss = L1loss(fake_img, HR)
 
+                if model_scale == 4:
+                    fake_img = model4(LR, scale_)
+                    model4.zero_grad()
+                    loss = L1loss(fake_img, HR)
+
+                loss.backward()
+                optimizer.step()
                 # Train Generator model
                 model.zero_grad()
                 loss = L1loss(fake_img, HR)
