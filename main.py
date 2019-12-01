@@ -95,7 +95,8 @@ def main():
                     fake_img = model2(LR, scale_)
                     model.zero_grad()
                     loss = L1loss(fake_img, HR)
-
+                #for param in conv1.parameters():
+                #    param.requires_grad = False
                 if model_scale == 4:
                     fake_img = model4(LR, scale_)
                     model4.zero_grad()

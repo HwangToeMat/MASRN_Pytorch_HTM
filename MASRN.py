@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.functional as F
+import common
 
 class FERB(nn.Module):
     def __init__(self, in_channels, k_size):
@@ -31,8 +32,12 @@ class FERB(nn.Module):
         return residual_1
 
 class Extraction_net(nn.Module):
-    def __init__(self, in_channels):
+    def __init__(self):
         super(Extraction_net, self).__init__()
+        # RGB mean for DIV2K
+        rgb_mean = (0.4488, 0.4371, 0.4040)
+        rgb_std = (1.0, 1.0, 1.0)
+        self.sub_mean = common.MeanShift(255, rgb_mean, rgb_std)
         self.input = nn.Conv2d(3, 64, 3, stride=1, padding=1)
         self.FERB_3 = FERB(64, 3)
         self.FERB_5 = FERB(64, 5)
@@ -40,6 +45,7 @@ class Extraction_net(nn.Module):
         self.FERB_9 = FERB(64, 9)
 
     def forward(self, x):
+        x = self.sub_mean(x)
         input = self.input(x)
         FERB_3 = self.FERB_3(input)
         FERB_5 = self.FERB_5(FERB_3)
@@ -49,14 +55,29 @@ class Extraction_net(nn.Module):
         return BottleNeck
 
 class Upscale_net(nn.Module):
-    
+    def __init__(self, scale):
+        super(Upscale_net, self).__init__()
+        conv= common.default_conv
+        self.upscale = nn.Sequential(
+            nn.Conv2d(320, 64, 1, stride=1, padding=0),
+            nn.Conv2d(64, 64, 3, stride=1, padding=1),
+            common.Upsampler(conv, scale, 64, act=False),
+            nn.Conv2d(64, 3, 3, stride=1, padding=1)
+        )
+
+    def forward(self, x):
+        output = self.upscale(x)
+        return output
 
 class Refine_net(nn.Module):
-    def __init__(self, in_channels):
+    def __init__(self):
         super(Refine_net, self).__init__()
+        # RGB mean for DIV2K
+        rgb_mean = (0.4488, 0.4371, 0.4040)
+        rgb_std = (1.0, 1.0, 1.0)
         self.input = nn.Conv2d(3, 16, 3, stride=1, padding=1)
         self.Asym_Block_1 = nn.Sequential(
-            nn.Conv2d(16, 16, (1, 1), stride=1, padding=0))
+            nn.Conv2d(16, 16, (1, 1), stride=1, padding=0),
             nn.ReLU(inplace=True),
             nn.Conv2d(16, 16, (1, 3), stride=1, padding=(0,1)),
             nn.Conv2d(16, 16, (3, 1), stride=1, padding=(1,0)),
@@ -87,6 +108,7 @@ class Refine_net(nn.Module):
             nn.ReLU(inplace=True)
         )
         self.concat = nn.Conv2d(64, 3, 1, stride=1, padding=0)
+        self.add_mean = common.MeanShift(255, rgb_mean, rgb_std, 1)
 
     def forward(self, HR):
         input = self.input(HR)
@@ -96,40 +118,25 @@ class Refine_net(nn.Module):
         Asym_4 = self.Asym_Block_4(input)
         residual = self.concat(torch.cat([Asym_1, Asym_2, Asym_3, Asym_4], 1))
         HR += residual
+        HR = self.add_mean(HR)
         return HR
 
 class MASRN_Net(nn.Module):
     def __init__(self):
         super(MASRN_Net, self).__init__()
-        self.input = nn.Conv2d(3, 64, 3, stride=1, padding=1)
-        self.ANRB1 = ANRB(64, 2)
-        self.ANRB1 = ANRB(64, 2)
-        self.ANRB1 = ANRB(64, 3)
-        self.ANRB1 = ANRB(64, 3)
-        self.ANRB1 = ANRB(64, 5)
-        self.ANRB1 = ANRB(64, 8)
-        self.ANRB1 = ANRB(64, 9)
-        self.ANRB3 = ANRB(64)
-        self.ANRB4 = ANRB(64)
-        self.ANRB5 = ANRB(64)
-        self.ANRB6 = ANRB(64)
-        self.ANRB7 = ANRB(64)
-        self.output = nn.Sequential(
-            nn.Conv2d(64*(7+1), 64, 1, stride=1, padding=0),
-            nn.Conv2d(64, 3, 3, stride=1, padding=1)
-        )
-        self.tanh = nn.Tanh()
+        self.Extraction = nn.Extraction_net()
+        self.Upscale_2 = nn.Upscale_net(2)
+        self.Upscale_3 = nn.Upscale_net(3)
+        self.Upscale_4 = nn.Upscale_net(4)
+        self.Refine = nn.Refine_net()
 
-    def forward(self, x):
-        R_0 = self.input(x)
-        R_1 = self.ANRB1(R_0)
-        R_2 = self.ANRB2(R_1)
-        R_3 = self.ANRB3(R_2)
-        R_4 = self.ANRB4(R_3)
-        R_5 = self.ANRB5(R_4)
-        R_6 = self.ANRB6(R_5)
-        R_7 = self.ANRB7(R_6)
-        output = self.output(torch.cat([R_0, R_1, R_2, R_3, R_4, R_5, R_6, R_7], 1))
-        output += x
-        output = (self.tanh(output)+1)/2
-        return output
+    def forward(self, x, scale):
+        Extraction = self.Extraction(x)
+        if scale == 2:
+            Upscale = self.Upscale_2(Extraction)
+        elif scale == 3:
+            Upscale = self.Upscale_3(Extraction)
+        elif scale == 4:
+            Upscale = self.Upscale_4(Extraction)
+        HR = self.Refine(Upscale)
+        return HR
