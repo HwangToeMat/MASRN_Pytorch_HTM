@@ -21,6 +21,6 @@ class Read_dataset_h5(data.Dataset):
         l_x3 = torch.from_numpy(self.label_x3[index,:,:,:]).float()
         l_x4 = torch.from_numpy(self.label_x4[index,:,:,:]).float()
         return i_x2, i_x3, i_x4, l_x2, l_x3, l_x4
-        
+
     def __len__(self):
-        return self.input.shape[0]
+        return self.input_x2.shape[0]

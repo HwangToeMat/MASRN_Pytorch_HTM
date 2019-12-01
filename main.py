@@ -14,11 +14,13 @@ import pytorch_ssim
 # Training settings
 parser = argparse.ArgumentParser(description="PyTorch MASRN")
 parser.add_argument("--batchSize", type=int, default=64)
-parser.add_argument("--nEpochs", type=int, default=100)
+parser.add_argument("--nEpochs", type=int, default=300)
 parser.add_argument("--cuda", action="store_true")
-parser.add_argument("--threads", type=int, default=4)
+parser.add_argument("--threads", type=int, default=8)
 parser.add_argument('--pretrained', default='', type=str)
-parser.add_argument('--datapath', default='data/train_1.h5', type=str)
+parser.add_argument('--datapath_1', default='data/train_1.h5', type=str)
+parser.add_argument('--datapath_2', default='data/train_2.h5', type=str)
+parser.add_argument('--datapath_3', default='data/train_3.h5', type=str)
 parser.add_argument("--gpus", default="0", type=str)
 
 def main():
@@ -44,16 +46,19 @@ def main():
     cudnn.benchmark = True # find optimal algorithms for hardware
 
     print("===> Loading datasets")
-    train_set = Read_dataset_h5(opt.datapath)
-    training_data_loader = DataLoader(dataset=train_set, num_workers=opt.threads,
+    train_set_1 = Read_dataset_h5(opt.datapath_1)
+    training_data_loader1 = DataLoader(dataset=train_set_1, num_workers=opt.threads,
+        batch_size=opt.batchSize, shuffle=True) # read to DataLoader
+    train_set_2 = Read_dataset_h5(opt.datapath_2)
+    training_data_loader2 = DataLoader(dataset=train_set_2, num_workers=opt.threads,
+        batch_size=opt.batchSize, shuffle=True) # read to DataLoader
+    train_set_3 = Read_dataset_h5(opt.datapath_3)
+    training_data_loader3 = DataLoader(dataset=train_set_3, num_workers=opt.threads,
         batch_size=opt.batchSize, shuffle=True) # read to DataLoader
 
     print("===> Building model")
-    model = MsINSR_Net()
-
-
+    model = MASRN_Net()
     L1loss = nn.L1Loss()
-
 
     # optionally copy weights from a checkpoint
     if opt.pretrained:
@@ -82,37 +87,27 @@ def main():
     for epoch_ in range(epoch, opt.nEpochs + 1):
         print("===>  Start epoch {} #################################################################".format(epoch_))
         model.train()
-        for _, (sub_ip_2, sub_ip_3, sub_ip_4, sub_la_2, sub_la_3, sub_la_4) in enumerate(training_data_loader):
-            HR_list = [sub_la_2, sub_la_3, sub_la_4]
-            LR_list = [sub_ip_2, sub_ip_3, sub_ip_4]
-            for scale_ = [2,3,4]
-                HR = Variable(HR_list[scale_-2])
-                LR = Variable(LR_list[scale_-2])
-                if torch.cuda.is_available():
-                    HR = HR.cuda()
-                    LR = LR.cuda()
-                if model_scale == 2:
-                    fake_img = model2(LR, scale_)
-                    model.zero_grad()
+        for data_loader in [training_data_loader1, training_data_loader2, training_data_loader3]:
+            for _, (sub_ip_2, sub_ip_3, sub_ip_4, sub_la_2, sub_la_3, sub_la_4) in enumerate(data_loader):
+                HR_list = [sub_la_2, sub_la_3, sub_la_4]
+                LR_list = [sub_ip_2, sub_ip_3, sub_ip_4]
+                for scale_ in [2,3,4]:
+                    HR = Variable(HR_list[scale_-2])
+                    LR = Variable(LR_list[scale_-2])
+                    if torch.cuda.is_available():
+                        HR = HR.cuda()
+                        LR = LR.cuda()
+                    # Train model
+                    model.set_scale(scale_)
+                    optimizer.zero_grad()
+                    fake_img = model(LR, scale_)
                     loss = L1loss(fake_img, HR)
-                #for param in conv1.parameters():
-                #    param.requires_grad = False
-                if model_scale == 4:
-                    fake_img = model4(LR, scale_)
-                    model4.zero_grad()
-                    loss = L1loss(fake_img, HR)
-
-                loss.backward()
-                optimizer.step()
-                # Train Generator model
-                model.zero_grad()
-                loss = L1loss(fake_img, HR)
-                loss.backward()
-                optimizer.step()
+                    loss.backward()
+                    optimizer.step()
 
             # Print Loss
             if _%5 == 0:
-                print("===> Epoch[[{}]({}/{})]: L1loss : {:.10f}, PSNR : {:.10f}, SSIM : {:.10f}".format(epoch_, _*3, len(training_data_loader)*3, loss.item(), PSNR(HR, fake_img), pytorch_ssim.ssim(HR, fake_img)))
+                print("===> Epoch[[{}]({}/{})]: L1loss : {:.5f}, PSNR : {:.5f}, SSIM : {:.5f}".format(epoch_, _*3, len(training_data_loader1)*3, loss.item(), PSNR(HR, fake_img), pytorch_ssim.ssim(HR, fake_img)))
 
         model_out_path = "checkpoint/" + "MASRN_epoch_{}.tar".format(epoch_)
         if not os.path.exists("checkpoint/"):

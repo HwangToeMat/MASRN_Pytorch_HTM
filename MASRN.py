@@ -55,19 +55,23 @@ class Extraction_net(nn.Module):
         return BottleNeck
 
 class Upscale_net(nn.Module):
-    def __init__(self, scale):
+    def __init__(self):
         super(Upscale_net, self).__init__()
         conv= common.default_conv
-        self.upscale = nn.Sequential(
+        self.input = nn.Sequential(
             nn.Conv2d(320, 64, 1, stride=1, padding=0),
-            nn.Conv2d(64, 64, 3, stride=1, padding=1),
-            common.Upsampler(conv, scale, 64, act=False),
-            nn.Conv2d(64, 3, 3, stride=1, padding=1)
+            nn.Conv2d(64, 64, 3, stride=1, padding=1)
         )
+        self.upscale = nn.ModuleList([
+            common.Upsampler(conv, s, 64, act=False) for s in [2, 3, 4]
+        ])
+        self.output = nn.Conv2d(64, 3, 3, stride=1, padding=1)
 
-    def forward(self, x):
-        output = self.upscale(x)
-        return output
+    def forward(self, x, scale_idx):
+        x = self.input(x)
+        x = self.upscale[scale_idx](x)
+        x = self.output(x)
+        return x
 
 class Refine_net(nn.Module):
     def __init__(self):
@@ -125,18 +129,14 @@ class MASRN_Net(nn.Module):
     def __init__(self):
         super(MASRN_Net, self).__init__()
         self.Extraction = nn.Extraction_net()
-        self.Upscale_2 = nn.Upscale_net(2)
-        self.Upscale_3 = nn.Upscale_net(3)
-        self.Upscale_4 = nn.Upscale_net(4)
+        self.Upscale = nn.Upscale_net()
         self.Refine = nn.Refine_net()
 
     def forward(self, x, scale):
         Extraction = self.Extraction(x)
-        if scale == 2:
-            Upscale = self.Upscale_2(Extraction)
-        elif scale == 3:
-            Upscale = self.Upscale_3(Extraction)
-        elif scale == 4:
-            Upscale = self.Upscale_4(Extraction)
+        Upscale = self.Upscale(Extraction, self.scale_idx - 2)
         HR = self.Refine(Upscale)
         return HR
+
+    def set_scale(self, scale_idx):
+        self.scale_idx = scale_idx
