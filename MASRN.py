@@ -74,7 +74,7 @@ class Refine_net(nn.Module):
         super(Refine_net, self).__init__()
         # RGB mean for DIV2K
         rgb_mean = (0.4488, 0.4371, 0.4040)
-        rgb_std = (1.0, 1.0, 1.0)
+        rgb_std = (1.0, 1.0, 1.0) 
         self.input = nn.Conv2d(3, 16, 3, stride=1, padding=1)
         self.Asym_Block_1 = nn.Sequential(
             nn.Conv2d(16, 16, (1, 1), stride=1, padding=0),
