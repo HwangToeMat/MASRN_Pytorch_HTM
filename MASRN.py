@@ -128,11 +128,12 @@ class Refine_net(nn.Module):
 class MASRN_Net(nn.Module):
     def __init__(self):
         super(MASRN_Net, self).__init__()
-        self.Extraction = nn.Extraction_net()
-        self.Upscale = nn.Upscale_net()
-        self.Refine = nn.Refine_net()
+        self.Extraction = Extraction_net()
+        self.Upscale = Upscale_net()
+        self.Refine = Refine_net()
+        self.scale_idx = 2
 
-    def forward(self, x, scale):
+    def forward(self, x):
         Extraction = self.Extraction(x)
         Upscale = self.Upscale(Extraction, self.scale_idx - 2)
         HR = self.Refine(Upscale)

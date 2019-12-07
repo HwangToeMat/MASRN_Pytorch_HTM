@@ -10,7 +10,7 @@ parser = argparse.ArgumentParser(description="PyTorch MASRN")
 parser.add_argument("--HRpath", type=str, default='data/DIV2K_train_HR')
 parser.add_argument("--Savepath", type=str, default='data/train_x234.h5')
 parser.add_argument("--LRsize", type=int, default=48)
-parser.add_argument("--Cropnum", type=int, default=20)
+parser.add_argument("--Cropnum", type=int, default=10)
 
 def data_aug():
     global opt

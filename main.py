@@ -100,7 +100,7 @@ def main():
                     # Train model
                     model.set_scale(scale_)
                     optimizer.zero_grad()
-                    fake_img = model(LR, scale_)
+                    fake_img = model(LR)
                     loss = L1loss(fake_img, HR)
                     loss.backward()
                     optimizer.step()
